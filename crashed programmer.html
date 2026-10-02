@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>代码找错 · 人机验证</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh; display: grid; place-items: center;
+    background: #eceff3;
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased; padding: 16px;
+  }
+  .app {
+    position: relative; width: 380px; max-width: 100%;
+    background: #fff; border-radius: 6px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.13), 0 14px 44px -12px rgba(0,0,0,.28);
+    overflow: hidden;
+  }
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  .home-head {
+    padding: 22px 20px 16px; text-align: center;
+    background: #1b5a8b; color: #fff;
+  }
+  .home-head .logo {
+    width: 46px; height: 46px; margin: 0 auto 10px;
+    border-radius: 12px; background: rgba(255,255,255,.14);
+    border: 1.5px solid rgba(255,255,255,.32);
+    display: grid; place-items: center;
+    font-size: 19px; font-weight: 800;
+    font-family: "SF Mono", Consolas, monospace;
+  }
+  .home-head h1 { font-size: 18px; letter-spacing: .5px; }
+  .home-head p { font-size: 12px; opacity: .82; margin-top: 4px; }
+
+  /* 模式按钮 */
+  .mode-row { display: flex; gap: 6px; padding: 12px 14px 6px; }
+  .mode-btn {
+    flex: 1; padding: 9px 6px; border: 1.5px solid #e4e9ef; border-radius: 8px;
+    background: #fff; color: #64748b; font-size: 12.5px; font-weight: 600;
+    font-family: inherit; cursor: pointer;
+    transition: border-color .15s, background .15s, color .15s;
+  }
+  .mode-btn.active { border-color: #1b5a8b; background: #eaf3fa; color: #1b5a8b; }
+
+  /* 难度按钮 */
+  .diff-row {
+    display: flex; gap: 6px; padding: 10px 14px 6px;
+    border-top: 1px solid #eef2f7; margin-top: 6px;
+  }
+  .diff-btn {
+    flex: 1; padding: 8px 4px; border: 1.5px solid #e4e9ef; border-radius: 8px;
+    background: #fff; color: #64748b; font-size: 12.5px; font-weight: 600;
+    font-family: inherit; cursor: pointer;
+    transition: all .15s;
+  }
+  .diff-btn.active {
+    border-color: #1b5a8b; background: #eaf3fa; color: #1b5a8b;
+  }
+  .diff-btn.hell { position: relative; }
+  .diff-btn.hell.active {
+    border-color: #dc2626; background: #fef2f2; color: #dc2626;
+    box-shadow: 0 0 0 3px rgba(220,38,38,.12);
+  }
+  .diff-btn.hell.active::after {
+    content: "🔥"; position: absolute; top: -8px; right: -6px;
+    font-size: 12px;
+  }
+
+  .lang-scroll { max-height: 320px; overflow-y: auto; padding: 8px 14px 0; }
+  .lang-scroll::-webkit-scrollbar { width: 6px; }
+  .lang-scroll::-webkit-scrollbar-thumb { background: #cfd8e0; border-radius: 3px; }
+  .lang-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .lang-card {
+    display: flex; align-items: center; gap: 9px;
+    padding: 9px 10px; border: 1.5px solid #e4e9ef; border-radius: 8px;
+    background: #fff; cursor: pointer;
+    transition: border-color .15s, box-shadow .15s, transform .1s, background .15s;
+  }
+  .lang-card:hover {
+    border-color: #9ec7e6; background: #f7fbfe;
+    box-shadow: 0 4px 12px -4px rgba(27,90,139,.3);
+  }
+  .lang-card:active { transform: scale(.975); }
+  .lang-icon {
+    flex: 0 0 30px; width: 30px; height: 30px; border-radius: 8px;
+    display: grid; place-items: center;
+    font-size: 9px; font-weight: 800;
+    font-family: "SF Mono", Consolas, monospace; letter-spacing: -.3px;
+  }
+  .lang-info { min-width: 0; }
+  .lang-name {
+    font-size: 12.5px; font-weight: 600; color: #22303c; line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .lang-sub { font-size: 9.5px; color: #9aa7b4; margin-top: 2px; }
+
+  .home-foot {
+    padding: 10px 16px 6px; text-align: center;
+    font-size: 11px; color: #a9b4c0; line-height: 1.6;
+  }
+  .home-foot b { color: #1b5a8b; }
+  .home-foot .danger { color: #dc2626; font-weight: 700; }
+
+  .credit {
+    text-align: center; font-size: 10.5px; color: #b4c0cd;
+    padding: 8px 0 12px; letter-spacing: .3px;
+    border-top: 1px solid #f1f5f9; margin-top: 6px;
+  }
+  .credit b { color: #64748b; font-weight: 600; }
+
+  /* 验证页 */
+  .cap-head {
+    position: relative; background: #1b5a8b; color: #fff;
+    padding: 13px 16px 14px; line-height: 1.35;
+  }
+  .cap-head.hell-mode {
+    background: linear-gradient(180deg, #7f1d1d, #b91c1c);
+    animation: hellPulse 2s ease-in-out infinite;
+  }
+  @keyframes hellPulse {
+    0%, 100% { box-shadow: inset 0 -4px 0 rgba(255,255,255,.08); }
+    50% { box-shadow: inset 0 -4px 0 rgba(255,255,255,.24); }
+  }
+  .cap-head .back {
+    position: absolute; top: 11px; right: 12px;
+    width: 26px; height: 26px; border: 0; border-radius: 5px;
+    background: rgba(255,255,255,.13); color: #fff;
+    font-size: 15px; line-height: 1;
+    display: grid; place-items: center; cursor: pointer;
+    transition: background .15s;
+  }
+  .cap-head .back:hover { background: rgba(255,255,255,.28); }
+  .cap-head .back:active { transform: scale(.94); }
+  .cap-head .label { font-size: 12.5px; opacity: .9; }
+  .cap-head .target {
+    font-size: 24px; font-weight: 700; letter-spacing: .5px;
+    margin: 3px 0 4px; line-height: 1.15;
+  }
+  .cap-head .desc { font-size: 12px; opacity: .88; line-height: 1.45; }
+
+  #gridArea {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 2px; padding: 2px; background: #fff;
+  }
+  .cell {
+    position: relative; aspect-ratio: 1 / 1.08;
+    background: #1e1e2e; border: 2.5px solid transparent;
+    cursor: pointer; overflow: hidden;
+    transition: border-color .1s, transform .07s;
+    user-select: none; -webkit-user-select: none;
+  }
+  .cell:active { transform: scale(.975); }
+  .cell.selected { border-color: #1b5a8b; }
+  .cell.selected::after {
+    content: ""; position: absolute; right: 3px; bottom: 3px;
+    width: 18px; height: 18px;
+    background: #1b5a8b url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E") center/12px no-repeat;
+    border-radius: 50%; z-index: 3;
+  }
+  .cell.wrong { border-color: #e53e3e; }
+  .cell.wrong::after {
+    content: ""; position: absolute; right: 3px; bottom: 3px;
+    width: 18px; height: 18px;
+    background: #e53e3e url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E") center/11px no-repeat;
+    border-radius: 50%; z-index: 3;
+  }
+  .lang-tag {
+    position: absolute; top: 0; left: 0;
+    font-size: 7.5px; font-weight: 800; letter-spacing: .4px;
+    color: #9aa7b4; background: rgba(255,255,255,.07);
+    padding: 2px 5px; z-index: 2;
+    font-family: "SF Mono", Consolas, monospace;
+  }
+  .code {
+    position: absolute; inset: 0;
+    padding: 15px 6px 5px 7px;
+    font-family: "SF Mono", "Monaco", "Consolas", "Liberation Mono", "Courier New", monospace;
+    font-size: 9.5px; line-height: 1.5; color: #d4d9e0;
+    white-space: pre; text-align: left; overflow: hidden;
+  }
+  .code .kw { color: #c792ea; }
+  .code .st { color: #c3e88d; }
+  .code .cm { color: #5a6675; font-style: italic; }
+  .code .nu { color: #f78c6c; }
+  .code .blk { color: #ffb454; font-weight: 600; }
+
+  #longArea { display: none; background: #1e1e2e; position: relative; }
+  .code-block {
+    position: relative; max-height: 400px; overflow-y: auto;
+    padding: 8px 0;
+    font-family: "SF Mono", "Monaco", "Consolas", "Liberation Mono", "Courier New", monospace;
+    font-size: 11.5px; line-height: 1.55; color: #d4d9e0;
+    user-select: none; -webkit-user-select: none;
+  }
+  .code-block::-webkit-scrollbar { width: 6px; }
+  .code-block::-webkit-scrollbar-thumb { background: #37404d; border-radius: 3px; }
+
+  .code-line {
+    display: flex; padding: 2px 10px;
+    cursor: pointer; white-space: pre;
+    transition: background .08s;
+  }
+  .code-line:hover { background: rgba(255,255,255,.04); }
+  .line-num {
+    flex: 0 0 32px; text-align: right;
+    padding-right: 12px; color: #4d5566;
+    font-size: 10.5px; user-select: none;
+  }
+  .line-code { flex: 1; white-space: pre; }
+
+  .code-line.selected { background: rgba(59, 130, 246, .28); }
+  .code-line.selected .line-num { color: #66c0f4; }
+  .code-line.wrong { background: rgba(229, 62, 62, .3); }
+  .code-line.wrong .line-num { color: #ff7b7b; }
+
+  .selection-rect {
+    position: absolute;
+    background: rgba(59, 130, 246, .18);
+    border: 1px solid rgba(59, 130, 246, .7);
+    pointer-events: none; z-index: 5;
+    border-radius: 2px;
+  }
+
+  .cap-foot {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; background: #fafbfc;
+    border-top: 1px solid #e9edf1; min-height: 54px;
+  }
+  .feedback {
+    flex: 1; font-size: 12px; color: #9aa7b4;
+    min-height: 17px; line-height: 1.35;
+  }
+  .feedback.ok  { color: #1e9e5a; font-weight: 700; }
+  .feedback.err { color: #e53e3e; font-weight: 600; }
+  .btn-refresh {
+    flex: 0 0 34px; width: 34px; height: 34px;
+    border: 1px solid #dbe2e9; border-radius: 6px;
+    background: #fff; color: #6b7a89; font-size: 17px; line-height: 1;
+    display: grid; place-items: center; cursor: pointer;
+    transition: background .15s, transform .4s, border-color .15s;
+  }
+  .btn-refresh:hover {
+    background: #f2f6fa; border-color: #c3d0dc; transform: rotate(180deg);
+  }
+  .btn-verify {
+    flex: 0 0 auto; padding: 9px 24px; border: 0; border-radius: 6px;
+    background: #1b5a8b; color: #fff; font-size: 13.5px; font-weight: 700;
+    font-family: inherit; letter-spacing: .5px; cursor: pointer;
+    transition: background .15s, transform .1s;
+  }
+  .btn-verify:hover:not(:disabled) { background: #164a73; }
+  .btn-verify:active:not(:disabled) { transform: scale(.96); }
+  .btn-verify:disabled { background: #b9c6d2; cursor: not-allowed; }
+  .btn-verify.hell {
+    background: linear-gradient(135deg, #dc2626, #991b1b);
+  }
+  .btn-verify.hell:hover:not(:disabled) { background: linear-gradient(135deg, #b91c1c, #7f1d1d); }
+
+  .shake { animation: shake .42s cubic-bezier(.36,.07,.19,.97); }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-5px); }
+    80% { transform: translateX(5px); }
+  }
+
+  .overlay {
+    position: absolute; inset: 0; background: rgba(255,255,255,.95);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 11px; opacity: 0; pointer-events: none;
+    transition: opacity .28s; z-index: 20; text-align: center; padding: 24px;
+  }
+  .overlay.show { opacity: 1; pointer-events: auto; }
+  .overlay .tick {
+    width: 54px; height: 54px; border-radius: 50%;
+    background: #1e9e5a; display: grid; place-items: center; color: #fff;
+    box-shadow: 0 10px 24px -8px rgba(30,158,90,.7);
+    animation: pop .38s cubic-bezier(.2,.9,.3,1.4);
+  }
+  @keyframes pop {
+    from { transform: scale(.4); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+  .overlay .tick svg { width: 27px; height: 27px; }
+  .overlay h2 { font-size: 17px; color: #22303c; }
+  .overlay p { font-size: 12.5px; color: #6b7a89; line-height: 1.7; }
+  .overlay p b { color: #1b5a8b; font-size: 17px; }
+  .ov-btns { display: flex; gap: 9px; margin-top: 5px; }
+  .btn-ghost, .btn-solid {
+    padding: 8px 18px; border-radius: 6px; font-size: 12.5px; font-weight: 600;
+    font-family: inherit; cursor: pointer;
+    transition: background .15s, transform .1s, border-color .15s;
+  }
+  .btn-ghost { background: #fff; border: 1.5px solid #dbe2e9; color: #4a5a68; }
+  .btn-ghost:hover { background: #f5f8fb; border-color: #c3d0dc; }
+  .btn-solid { background: #1b5a8b; border: 0; color: #fff; }
+  .btn-solid:hover { background: #164a73; }
+  .btn-ghost:active, .btn-solid:active { transform: scale(.96); }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <section class="screen active" id="homeScreen">
+    <div class="home-head">
+      <div class="logo">&lt;/&gt;</div>
+      <h1>代码找错</h1>
+      <p>选择语言与模式开始验证</p>
+    </div>
+
+    <div class="mode-row">
+      <button class="mode-btn active" data-mode="grid" type="button">九宫格模式</button>
+      <button class="mode-btn" data-mode="long" type="button">长代码框选</button>
+    </div>
+
+    <div class="diff-row">
+      <button class="diff-btn active" data-diff="normal" type="button">普通</button>
+      <button class="diff-btn" data-diff="hard" type="button">困难</button>
+      <button class="diff-btn hell" data-diff="hell" type="button">地狱 🔥</button>
+    </div>
+
+    <div class="lang-scroll">
+      <div class="lang-grid" id="langGrid"></div>
+    </div>
+
+    <div class="home-foot" id="homeFoot">
+      每关最多 <b>3</b> 张正确代码<br>选出所有包含指定错误的片段
+    </div>
+
+    <div class="credit">制作者：<b>白糖</b> &amp; <b>DeepSeek</b></div>
+  </section>
+
+  <section class="screen" id="gameScreen">
+    <div class="cap-head" id="capHead">
+      <button class="back" id="backBtn" title="返回" type="button">←</button>
+      <div class="label">请选择包含</div>
+      <div class="target" id="targetLabel">语法错误</div>
+      <div class="desc" id="descText">
+        的所有代码。<br>在没有新代码可以点按后，请点击“验证”。
+      </div>
+    </div>
+
+    <div id="gridArea"></div>
+
+    <div id="longArea">
+      <div class="code-block" id="codeBlock"></div>
+    </div>
+
+    <div class="cap-foot">
+      <button class="btn-refresh" id="refreshBtn" title="换一组" type="button">↻</button>
+      <div class="feedback" id="feedback"></div>
+      <button class="btn-verify" id="verifyBtn" type="button">验证</button>
+    </div>
+
+    <div class="overlay" id="overlay">
+      <div class="tick">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 13l4 4L19 7"/>
+        </svg>
+      </div>
+      <h2>验证通过</h2>
+      <p>当前得分 <b id="overScore">0</b></p>
+      <div class="ov-btns">
+        <button class="btn-ghost" id="overHome" type="button">返回首页</button>
+        <button class="btn-solid" id="overNext" type="button">下一关</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* =========================================================
+     题库（"不存在/未定义" 已替换为 "123"）
+     ========================================================= */
+  const DB = {
+    javascript: {
+      name: 'JavaScript', short: 'JS', color: '#f7df1e', textColor: '#22303c',
+      syntax: [
+        { lang: 'JS', code: 'const x = 5;\nif (x > 3) {\n  console.log("big");\n// 缺少闭合 }' },
+        { lang: 'JS', code: 'let arr = [1, 2, 3\nconsole.log(arr);' },
+        { lang: 'JS', code: 'function add(a, b {\n  return a + b;\n}' },
+        { lang: 'JS', code: 'const o = {\n  name: "tom"\n  age: 18\n};' }
+      ],
+      logic: [
+        { lang: 'JS', code: 'let sum = 0;\nfor (let i=1; i<10; i++)\n  sum += i;\n// 想加到 10' },
+        { lang: 'JS', code: 'if (a = 5) {\n  console.log("five");\n}\n// 应为 ===' },
+        { lang: 'JS', code: 'let n = 0;\nwhile (n < 5) {\n  console.log(n);\n}\n// 忘了 n++' },
+        { lang: 'JS', code: 'let i = 0;\nfor (; i < 10; i--) {\n  console.log(i);\n}\n// 应为 i++' }
+      ],
+      runtime: [
+        { lang: 'JS', code: 'const u = null;\nconsole.log(u.name);' },
+        { lang: 'JS', code: 'JSON.parse("{123}");' },
+        { lang: 'JS', code: 'const arr = [1,2];\nconsole.log(arr[10].x);' },
+        { lang: 'JS', code: 'fn123();\n// 函数 123 未定义' }
+      ],
+      ok: [
+        { lang: 'JS', code: 'const nums = [1,2,3];\nconst d = nums.map(n => n*2);' },
+        { lang: 'JS', code: 'async function load() {\n  const r = await fetch(u);\n  return r.json();\n}' },
+        { lang: 'JS', code: 'const sum = [1,2,3]\n  .reduce((a,b) => a+b, 0);' },
+        { lang: 'JS', code: 'const { name, age } = user;' },
+        { lang: 'JS', code: '[1,2,3].forEach(n => {\n  console.log(n);\n});' }
+      ]
+    },
+
+    typescript: {
+      name: 'TypeScript', short: 'TS', color: '#3178c6', textColor: '#ffffff',
+      syntax: [
+        { lang: 'TS', code: 'interface User {\n  name: string\n  age: number\n// 缺少 }' },
+        { lang: 'TS', code: 'let arr: string[] = ["a", "b"\nconsole.log(arr);' },
+        { lang: 'TS', code: 'enum Color {\n  Red,\n  Green\n// 缺少 }' }
+      ],
+      logic: [
+        { lang: 'TS', code: 'const n: number = "5";\n// 类型不匹配' },
+        { lang: 'TS', code: 'let sum = 0;\nfor (let i=1; i<10; i++)\n  sum += i;\n// 想加到 10' },
+        { lang: 'TS', code: 'if (a = 5) {\n  console.log("five");\n}\n// 应为 ===' }
+      ],
+      runtime: [
+        { lang: 'TS', code: 'const u = null;\nconsole.log(u.name);' },
+        { lang: 'TS', code: 'JSON.parse("{123}");' },
+        { lang: 'TS', code: 'const arr: number[] = [];\nconsole.log(arr[0].toFixed());' }
+      ],
+      ok: [
+        { lang: 'TS', code: 'interface User {\n  name: string;\n  age: number;\n}' },
+        { lang: 'TS', code: 'function add(a: number, b: number): number {\n  return a + b;\n}' },
+        { lang: 'TS', code: 'type Status = "on" | "off";\nconst s: Status = "on";' },
+        { lang: 'TS', code: 'function greet(name: string): string {\n  return `Hi, ${name}`;\n}' }
+      ]
+    },
+
+    python: {
+      name: 'Python', short: 'PY', color: '#3776ab', textColor: '#ffffff',
+      syntax: [
+        { lang: 'PY', code: 'def greet(name)\n    print("Hi")' },
+        { lang: 'PY', code: 'for i in range(5)\n    print(i)' },
+        { lang: 'PY', code: 'x = 5\nif x > 3\n    print("big")' },
+        { lang: 'PY', code: 'd = {"a": 1\nprint(d)' }
+      ],
+      logic: [
+        { lang: 'PY', code: 'i = 0\nwhile i < 10:\n    print(i)\n# 忘了 i += 1' },
+        { lang: 'PY', code: 'def add(a, b):\n    return a - b\n# 应返回 a + b' },
+        { lang: 'PY', code: 'if x > 3 or x < 10:\n    print("恒真")\n# 应用 and' },
+        { lang: 'PY', code: 'total = 0\nfor i in range(1, 5):\n    total += i\n# 想加到 5' }
+      ],
+      runtime: [
+        { lang: 'PY', code: 'x = 10 / 0' },
+        { lang: 'PY', code: 'data = {}\nprint(data["key"])' },
+        { lang: 'PY', code: 'num = int("hello")' },
+        { lang: 'PY', code: 's = None\nprint(s.upper())' }
+      ],
+      ok: [
+        { lang: 'PY', code: 'def fib(n):\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a' },
+        { lang: 'PY', code: 'nums = [1, 2, 3]\nsq = [x*x for x in nums]' },
+        { lang: 'PY', code: 'with open("f.txt") as f:\n    data = f.read()' },
+        { lang: 'PY', code: 'nums = sorted([3, 1, 2])' }
+      ]
+    },
+
+    java: {
+      name: 'Java', short: 'JA', color: '#ed8b00', textColor: '#ffffff',
+      syntax: [
+        { lang: 'JA', code: 'int x = 10\nSystem.out.println(x);' },
+        { lang: 'JA', code: 'String s = "hi"\nint n = s.length();' },
+        { lang: 'JA', code: 'class A {\n  void run() {\n    int x = 5\n  }\n}' },
+        { lang: 'JA', code: 'public class User {\n  private String name\n}' }
+      ],
+      logic: [
+        { lang: 'JA', code: 'if (x > 0);\n  System.out.println("正");\n// 分号造成空语句' },
+        { lang: 'JA', code: 'int r = 0;\nr =+ 5;\n// 应为 += 而非 =+' },
+        { lang: 'JA', code: 'String a = "abc";\nif (a == "abc") { }\n// 应用 equals' },
+        { lang: 'JA', code: 'int i = 0;\nwhile (i < 10) {\n  i--;\n}\n// 应为 i++' }
+      ],
+      runtime: [
+        { lang: 'JA', code: 'int[] a = new int[3];\nint x = a[5];' },
+        { lang: 'JA', code: 'String s = null;\nint n = s.length();' },
+        { lang: 'JA', code: 'int x = Integer.parseInt("abc");' },
+        { lang: 'JA', code: 'int a = 10, b = 0;\nint c = a / b;' }
+      ],
+      ok: [
+        { lang: 'JA', code: 'try {\n  int x = 10 / 2;\n} catch (Exception e) {\n  e.printStackTrace();\n}' },
+        { lang: 'JA', code: 'for (int i=0; i<5; i++) {\n  System.out.println(i);\n}' },
+        { lang: 'JA', code: 'var m = new HashMap<>();\nm.put("a", 1);\nint v = m.get("a");' },
+        { lang: 'JA', code: 'int[] a = {1, 2, 3};\nint sum = 0;\nfor (int x : a) sum += x;' }
+      ]
+    },
+
+    go: {
+      name: 'Go', short: 'GO', color: '#00add8', textColor: '#ffffff',
+      syntax: [
+        { lang: 'GO', code: 'func main() {\n    fmt.Println("hi")\n// 缺少 }' },
+        { lang: 'GO', code: 'func add(a, b int) int {\n    return a + b\n// 缺少 }' },
+        { lang: 'GO', code: 'if x > 0\n    fmt.Println("hi")\n}' }
+      ],
+      logic: [
+        { lang: 'GO', code: 'for i:=0; i<len(a); i++ {\n    a = append(a, i)\n}\n// 长度不断变大' },
+        { lang: 'GO', code: 'x := 5\nif x = 10 {\n    fmt.Println("hi")\n}\n// 赋值误当比较' },
+        { lang: 'GO', code: 'for i := 0; i < 10; i-- {\n    fmt.Println(i)\n}\n// 应为 i++' }
+      ],
+      runtime: [
+        { lang: 'GO', code: 'var m map[string]int\nm["key"] = 1\n// nil map 赋值' },
+        { lang: 'GO', code: 'var p *int\nfmt.Println(*p)\n// 空指针解引用' },
+        { lang: 'GO', code: 'a := []int{1, 2, 3}\nfmt.Println(a[10])' }
+      ],
+      ok: [
+        { lang: 'GO', code: 'for i := 0; i < 5; i++ {\n    fmt.Println(i)\n}' },
+        { lang: 'GO', code: 'func add(a, b int) int {\n    return a + b\n}' },
+        { lang: 'GO', code: 'm := make(map[string]int)\nm["a"] = 1' },
+        { lang: 'GO', code: 'for _, v := range nums {\n    fmt.Println(v)\n}' }
+      ]
+    },
+
+    cpp: {
+      name: 'C++', short: 'C++', color: '#00599c', textColor: '#ffffff',
+      syntax: [
+        { lang: 'C++', code: 'int main() {\n    cout << "hi" << endl\n    return 0;\n}' },
+        { lang: 'C++', code: 'for (int i=0; i<5 i++) {\n    cout << i;\n}' },
+        { lang: 'C++', code: 'void f() {\n    int x = 5;\n// 缺少 }' }
+      ],
+      logic: [
+        { lang: 'C++', code: 'int x = 10;\nif (x = 5) {\n    cout << "eq";\n}\n// 赋值误当比较' },
+        { lang: 'C++', code: 'int a[5];\nfor (int i=0; i<=5; i++)\n    a[i] = 0;\n// 数组越界' },
+        { lang: 'C++', code: 'int s = 0;\nfor (int i=0; i<10; i++)\n    s =+ i;\n// 应为 +=' }
+      ],
+      runtime: [
+        { lang: 'C++', code: 'int* p = nullptr;\n*p = 42;' },
+        { lang: 'C++', code: 'int a[3];\ncout << a[10];' },
+        { lang: 'C++', code: 'int x = 10 / 0;' }
+      ],
+      ok: [
+        { lang: 'C++', code: 'vector<int> v = {1,2,3};\nfor (int x : v) cout << x;' },
+        { lang: 'C++', code: 'string s = "hello";\ncout << s.size();' },
+        { lang: 'C++', code: 'auto f = [](int a, int b){\n    return a + b;\n};' },
+        { lang: 'C++', code: 'sort(v.begin(), v.end());' }
+      ]
+    },
+
+    rust: {
+      name: 'Rust', short: 'RS', color: '#ce422b', textColor: '#ffffff',
+      syntax: [
+        { lang: 'RS', code: 'fn main() {\n    println!("hi")\n// 缺少 }' },
+        { lang: 'RS', code: 'let x = 5\nprintln!("{}", x);' },
+        { lang: 'RS', code: 'let v = vec![1, 2, 3]\nprintln!("{:?}", v);' }
+      ],
+      logic: [
+        { lang: 'RS', code: 'let mut sum = 0;\nfor i in 1..10 {\n    sum += i;\n}\n// 1..10 不含 10' },
+        { lang: 'RS', code: 'let x = 5;\nif x = 5 {\n    println!("eq");\n}\n// 应为 ==' },
+        { lang: 'RS', code: 'let mut n = 0;\nwhile n < 5 {\n    println!("{}", n);\n}\n// 忘了 n += 1' }
+      ],
+      runtime: [
+        { lang: 'RS', code: 'let v = vec![1, 2];\nlet x = v[5];' },
+        { lang: 'RS', code: 'panic!("boom");' },
+        { lang: 'RS', code: 'let n: i32 = 100;\nlet x = n / 0;' }
+      ],
+      ok: [
+        { lang: 'RS', code: 'let mut sum = 0;\nfor i in 1..=10 {\n    sum += i;\n}' },
+        { lang: 'RS', code: 'fn greet(name: &str) {\n    println!("{}", name);\n}' },
+        { lang: 'RS', code: 'let s = "hello";\nprintln!("{}", s.len());' },
+        { lang: 'RS', code: 'let r = match n {\n    0 => "zero",\n    _ => "other",\n};' }
+      ]
+    },
+
+    csharp: {
+      name: 'C#', short: 'C#', color: '#68217a', textColor: '#ffffff',
+      syntax: [
+        { lang: 'C#', code: 'Console.WriteLine("hi")\nint x = 5;' },
+        { lang: 'C#', code: 'class A {\n  void Run() {\n    int x = 5\n  }\n}' },
+        { lang: 'C#', code: 'if (x > 0) {\n  Console.WriteLine("hi")\n}' }
+      ],
+      logic: [
+        { lang: 'C#', code: 'if (x = 5) {\n  Console.WriteLine("5");\n}\n// 应为 ==' },
+        { lang: 'C#', code: 'int n = 0;\nwhile (n < 5) {\n  Console.WriteLine(n);\n}\n// 忘了 n++' },
+        { lang: 'C#', code: 'int r = 0;\nr =+ 5;\n// 应为 +=' }
+      ],
+      runtime: [
+        { lang: 'C#', code: 'string s = null;\nConsole.WriteLine(s.Length);' },
+        { lang: 'C#', code: 'int[] a = new int[3];\nint x = a[5];' },
+        { lang: 'C#', code: 'int x = int.Parse("abc");' }
+      ],
+      ok: [
+        { lang: 'C#', code: 'var a = new[]{1,2,3};\nforeach (var n in a)\n    Console.WriteLine(n);' },
+        { lang: 'C#', code: 'try {\n  int x = 10 / 2;\n} catch (Exception) {\n  throw;\n}' },
+        { lang: 'C#', code: 'string s = "Hello";\nint n = s.Length;' },
+        { lang: 'C#', code: 'var nums = new[]{1, 2};\nvar sum = nums.Sum();' }
+      ]
+    },
+
+    html: {
+      name: 'HTML', short: 'HTML', color: '#e34c26', textColor: '#ffffff',
+      syntax: [
+        { lang: 'HTML', code: '<div>\n  <p>Hello<\/div>\n<\/p>\n<!-- 标签交叉 -->' },
+        { lang: 'HTML', code: '<a href="page.html">Go<\/a\n<!-- 结束标签不完整 -->' },
+        { lang: 'HTML', code: '<div class="box>Text<\/div>\n<!-- 引号未闭合 -->' },
+        { lang: 'HTML', code: '<ul>\n  <li>一\n  <li>二\n<\/ul>\n<!-- 缺少闭合 -->' }
+      ],
+      logic: [
+        { lang: 'HTML', code: '<div>\n  <p>段落\n    <div>块级<\/div>\n  <\/p>\n<\/div>\n<!-- p 内不能嵌 div -->' },
+        { lang: 'HTML', code: '<a href="#">\n  <div onclick="go()">提交<\/div>\n<\/a>\n<!-- 应用 button -->' },
+        { lang: 'HTML', code: '<img src="a.png">\n<!-- 缺少 alt 属性 -->' },
+        { lang: 'HTML', code: '<input type="text">\n<!-- 表单元素缺少 name -->' }
+      ],
+      runtime: [
+        { lang: 'HTML', code: '<img src="img123.png">\n<!-- 图片 123 加载失败 -->' },
+        { lang: 'HTML', code: '<script src="js123.js"><\/script>\n<!-- 文件 123 不存在 -->' },
+        { lang: 'HTML', code: '<link rel="stylesheet" href="css123.css">\n<!-- 路径 123 错误 -->' },
+        { lang: 'HTML', code: '<video src="video123.mp4"><\/video>\n<!-- 资源 123 加载失败 -->' }
+      ],
+      ok: [
+        { lang: 'HTML', code: '<img src="a.png" alt="示例图">' },
+        { lang: 'HTML', code: '<button type="submit">提交<\/button>' },
+        { lang: 'HTML', code: '<ul>\n  <li>一<\/li>\n  <li>二<\/li>\n<\/ul>' },
+        { lang: 'HTML', code: '<a href="/home">返回首页<\/a>' },
+        { lang: 'HTML', code: '<input type="text" name="user" id="user">' },
+        { lang: 'HTML', code: '<label for="pwd">密码<\/label>\n<input id="pwd" type="password">' }
+      ]
+    },
+
+    css: {
+      name: 'CSS', short: 'CSS', color: '#264de4', textColor: '#ffffff',
+      syntax: [
+        { lang: 'CSS', code: '.box {\n  color: red\n  font-size: 14px;\n}\n/* 缺少分号 */' },
+        { lang: 'CSS', code: '.box {\n  color: red;\n/* 缺少 } */' },
+        { lang: 'CSS', code: '.box {\n  width: 100px;\n  height: ;\n}\n/* 值缺失 */' },
+        { lang: 'CSS', code: '.a { color: red;\n.b { color: blue; }\n/* 缺少 } */' }
+      ],
+      logic: [
+        { lang: 'CSS', code: '.box {\n  position: static;\n  z-index: 999;\n}\n/* z-index 无效 */' },
+        { lang: 'CSS', code: '.box {\n  width: 100px;\n  padding: 10px;\n  border: 1px;\n}\n/* 实际宽 122px */' },
+        { lang: 'CSS', code: '.box {\n  margin: 0 auto;\n  /* 没有设置宽度 */\n}' },
+        { lang: 'CSS', code: 'p {\n  color: red !important;\n  /* 滥用 !important */\n}' }
+      ],
+      runtime: [
+        { lang: 'CSS', code: 'body {\n  background: url("bg123.png");\n  /* 资源 123 加载失败 */\n}' },
+        { lang: 'CSS', code: '@font-face {\n  src: url("font123.woff2");\n}\n/* 字体 123 不存在 */' },
+        { lang: 'CSS', code: '.box {\n  color: var(--123);\n  /* 变量 123 未定义 */\n}' },
+        { lang: 'CSS', code: '@import url("css123.css");\n/* 文件 123 不存在 */' }
+      ],
+      ok: [
+        { lang: 'CSS', code: '.box {\n  width: 100px;\n  height: 100px;\n  background: #f00;\n}' },
+        { lang: 'CSS', code: '.flex {\n  display: flex;\n  justify-content: center;\n  align-items: center;\n}' },
+        { lang: 'CSS', code: 'a:hover {\n  color: #3b82f6;\n}' },
+        { lang: 'CSS', code: '@media (max-width: 600px) {\n  .box { display: none; }\n}' },
+        { lang: 'CSS', code: ':root {\n  --main: #1b5a8b;\n}\n.box {\n  color: var(--main);\n}' },
+        { lang: 'CSS', code: '.box {\n  box-sizing: border-box;\n  width: 100px;\n  padding: 10px;\n}' }
+      ]
+    },
+
+    sql: {
+      name: 'SQL', short: 'SQL', color: '#00758f', textColor: '#ffffff',
+      syntax: [
+        { lang: 'SQL', code: 'SELECT * FORM users;\n/* FORM 拼写错误 */' },
+        { lang: 'SQL', code: 'SELECT * FROM WHERE id = 1;\n/* 缺少表名 */' },
+        { lang: 'SQL', code: 'INSERT INTO users (name, age)\nVALUES ("Tom", 18\n/* 缺少右括号 */' }
+      ],
+      logic: [
+        { lang: 'SQL', code: 'DELETE FROM users;\n/* 忘了 WHERE，删除全表 */' },
+        { lang: 'SQL', code: 'UPDATE users SET vip = 1;\n/* 忘了 WHERE */' },
+        { lang: 'SQL', code: 'SELECT * FROM users\nWHERE name = NULL;\n/* 应该用 IS NULL */' }
+      ],
+      runtime: [
+        { lang: 'SQL', code: 'SELECT * FROM table123;' },
+        { lang: 'SQL', code: 'SELECT col123 FROM users;' },
+        { lang: 'SQL', code: 'INSERT INTO users (id) VALUES (1);\n/* 主键冲突 */' }
+      ],
+      ok: [
+        { lang: 'SQL', code: 'SELECT id, name FROM users\nWHERE id = 1;' },
+        { lang: 'SQL', code: 'INSERT INTO users (name, age)\nVALUES ("Tom", 18);' },
+        { lang: 'SQL', code: 'UPDATE users SET vip = 1\nWHERE id = 5;' },
+        { lang: 'SQL', code: 'DELETE FROM users WHERE id = 5;' }
+      ]
+    },
+
+    php: {
+      name: 'PHP', short: 'PHP', color: '#777bb4', textColor: '#ffffff',
+      syntax: [
+        { lang: 'PHP', code: '<?php\necho "Hello"\n?>\n// 缺少分号' },
+        { lang: 'PHP', code: '<?php\n$name = "Tom"\necho $name;\n?>' },
+        { lang: 'PHP', code: '<?php\nif ($x > 0) {\n  echo "正";\n?>\n// 缺少 }' }
+      ],
+      logic: [
+        { lang: 'PHP', code: '<?php\nif ($x = 5) {\n  echo "five";\n}\n// 应为 ==' },
+        { lang: 'PHP', code: '<?php\nfor ($i = 0; $i < 10; $i--) {\n  echo $i;\n}\n// 应为 $i++' },
+        { lang: 'PHP', code: '<?php\n$sum = 0;\nforeach ($arr as $v) {\n  $sum = $v;\n}\n// 应为 +=' }
+      ],
+      runtime: [
+        { lang: 'PHP', code: '<?php\n$obj = null;\necho $obj->name;\n?>' },
+        { lang: 'PHP', code: '<?php\necho 10 / 0;\n?>' },
+        { lang: 'PHP', code: '<?php\n$arr = [];\necho $arr["key"];\n?>' }
+      ],
+      ok: [
+        { lang: 'PHP', code: '<?php\necho "Hello";\n?>' },
+        { lang: 'PHP', code: '<?php\nforeach ($arr as $k => $v) {\n  echo $k . ": " . $v;\n}\n?>' },
+        { lang: 'PHP', code: '<?php\nfunction add($a, $b) {\n  return $a + $b;\n}\n?>' },
+        { lang: 'PHP', code: '<?php\n$name = $_POST["name"] ?? "匿名";\necho htmlspecialchars($name);\n?>' }
+      ]
+    },
+
+    scratch: {
+      name: 'Scratch', short: 'SB', color: '#ff8c1a', textColor: '#ffffff',
+      syntax: [
+        { lang: 'SB', code: '[当绿旗被点击]\n[重复执行 10 次]\n  [移动 10 步]\n// 缺少「结束」积木，无法闭合' },
+        { lang: 'SB', code: '[当绿旗被点击]\n[如果 <碰到边缘> 那么]\n  [等待 1 秒]\n// 缺少「结束」积木' },
+        { lang: 'SB', code: '[当绿旗被点击]\n[如果 <> 那么]\n  [移动 10 步]\n// 条件槽为空' },
+        { lang: 'SB', code: '[当绿旗被点击]\n[说 (x)]\n// 变量 x 未创建，插槽为空' },
+        { lang: 'SB', code: '[定义 画方]\n  [重复执行 4 次]\n    [移动 100 步]\n    [右转 90 度]\n// 缺少「结束」积木' }
+      ],
+      logic: [
+        { lang: 'SB', code: '[当绿旗被点击]\n[重复执行直到 <碰到边缘>]\n  [移动 10 步]\n// 初始就在边缘，立即停止' },
+        { lang: 'SB', code: '[当绿旗被点击]\n[将 [计数] 设为 0]\n[重复执行 10 次]\n  [将 [计数] 增加 1]\n// 期望计数为 100' },
+        { lang: 'SB', code: '[当绿旗被点击]\n[如果 <1 > 2> 那么]\n  [说 "正确"]\n// 条件永远为假' },
+        { lang: 'SB', code: '[当绿旗被点击]\n[重复执行 10 次]\n  [将 [分数] 增加 1]\n// 分数未初始化' },
+        { lang: 'SB', code: '[当绿旗被点击]\n[重复执行]\n  [移动 10 步]\n// 缺少「等待」，CPU 占满' },
+        { lang: 'SB', code: '[当绿旗被点击]\n[将 [x] 设为 1]\n[将 [y] 设为 2]\n[说 (x + y)]\n// 期望输出 12，实际是 3' }
+      ],
+      runtime: [
+        { lang: 'SB', code: '[当绿旗被点击]\n[将 [x] 设为 10]\n[将 [x] 除以 0]' },
+        { lang: 'SB', code: '[当绿旗被点击]\n[切换背景到 [bg123 v]]\n// 背景 123 不存在' },
+        { lang: 'SB', code: '[当绿旗被点击]\n[克隆 [sprite123 v]]\n// 角色 123 不存在' },
+        { lang: 'SB', code: '[当绿旗被点击]\n[播放声音 [sound123 v] 等待播完]\n// 声音 123 不存在' },
+        { lang: 'SB', code: '[当绿旗被点击]\n[说 (var123)]\n// 变量 123 未定义' }
+      ],
+      ok: [
+        { lang: 'SB', code: '[当绿旗被点击]\n[将 [分数] 设为 0]\n[重复执行直到 <分数 = 10>]\n  [将 [分数] 增加 1]' },
+        { lang: 'SB', code: '[当绿旗被点击]\n[重复执行 10 次]\n  [移动 10 步]\n  [等待 0.1 秒]' },
+        { lang: 'SB', code: '[当绿旗被点击]\n[如果 <碰到 [边缘 v]> 那么]\n  [说 "碰到边缘了！"]' },
+        { lang: 'SB', code: '[当绿旗被点击]\n[重复执行]\n  [移动 10 步]\n  [碰到边缘就反弹]' },
+        { lang: 'SB', code: '[当绿旗被点击]\n[隐藏]\n[等待 2 秒]\n[显示]' },
+        { lang: 'SB', code: '[定义 画方]\n  [重复执行 4 次]\n    [移动 100 步]\n    [右转 90 度]' }
+      ]
+    }
+  };
+
+  const TYPE_NAMES = {
+    syntax: '语法错误',
+    logic: '逻辑错误',
+    runtime: '运行时错误'
+  };
+
+  /* =========================================================
+     工具
+     ========================================================= */
+  const $ = id => document.getElementById(id);
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+  function sample(arr, n) {
+    const copy = arr.slice();
+    const out = [];
+    while (out.length < n && copy.length) {
+      out.push(copy.splice(Math.floor(Math.random() * copy.length), 1)[0]);
+    }
+    return out;
+  }
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  /* =========================================================
+     定时器管理
+     ========================================================= */
+  const pendingTimers = new Set();
+
+  function later(fn, ms) {
+    const id = setTimeout(() => {
+      pendingTimers.delete(id);
+      fn();
+    }, ms);
+    pendingTimers.add(id);
+    return id;
+  }
+
+  function cancelAllTimers() {
+    pendingTimers.forEach(id => clearTimeout(id));
+    pendingTimers.clear();
+  }
+
+  /* =========================================================
+     语法高亮
+     ========================================================= */
+  function esc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  const KEYWORDS = [
+    'function','const','let','var','if','else','for','while','return','class','new','this',
+    'typeof','instanceof','interface','type','enum','implements','extends','readonly',
+    'void','never','unknown','as','string','number','boolean','declare','namespace','module',
+    'async','await','try','catch','finally','throw','import','export','default','switch','case',
+    'break','continue','delete','in','of','null','true','false','undefined',
+    'public','private','protected','static','int','double','float','char','long','short','byte',
+    'String','List','ArrayList','HashMap','Map','Set','out','ref','base','sealed','virtual','override',
+    'super','package','params','foreach','using',
+    'def','print','elif','except','raise','lambda','pass','and','or','not','is','None',
+    'True','False','self','with','global','assert','del','yield','from',
+    'fn','mut','use','struct','impl','match','pub','crate','trait','where','mod','move','dyn','unsafe',
+    'func','range','defer','chan','map','go','select','fallthrough',
+    'std','cout','endl','cin','vector','nullptr','auto','sizeof','template','typename','sort','begin','end',
+    'SELECT','FROM','WHERE','INSERT','INTO','VALUES','UPDATE','SET','DELETE','JOIN','INNER',
+    'LEFT','RIGHT','OUTER','ON','GROUP','BY','ORDER','HAVING','LIMIT','OFFSET','AS','AND','OR',
+    'NOT','NULL','IS','IN','LIKE','BETWEEN','CREATE','TABLE','PRIMARY','KEY','FOREIGN','INDEX',
+    'DROP','ALTER','DISTINCT','COUNT','SUM','AVG','MAX','MIN','DESC','ASC','UNION','EXISTS',
+    'CASE','WHEN','THEN',
+    'echo','require','include','php','print_r','htmlspecialchars',
+    'div','span','href','src','alt','input','script','link','meta','title','body','head','html',
+    'ul','ol','li','form','button','img','video','audio','table','tr','td','th','label','select',
+    'option','textarea','canvas','svg','path','style','section','header','footer','nav','main',
+    'article','aside','iframe','class','id','rel','for','value','placeholder','viewport','action',
+    'method','name','target','submit','password','text','checkbox','radio'
+  ];
+  const KW_REGEX = '\\b(?:' + KEYWORDS.join('|') + ')\\b';
+
+  const HL_REGEX = new RegExp(
+    '(' + '"(?:[^"\\\\]|\\\\.)*"' + '|' + "'(?:[^'\\\\]|\\\\.)*'" + '|' + '`(?:[^`\\\\]|\\\\.)*`' + ')' +
+    '|' + '(\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/|&lt;!--[\\s\\S]*?--&gt;)' +
+    '|' + '(' + KW_REGEX + ')' +
+    '|' + '\\b(\\d+(?:\\.\\d+)?)\\b',
+    'g'
+  );
+
+  function highlight(code) {
+    const safe = esc(code);
+    const blocks = [];
+    const stashed = safe.replace(/\[([^\[\]]+)\]/g, (m, inner) => {
+      blocks.push(inner);
+      return '\u0001B' + (blocks.length - 1) + '\u0001';
+    });
+
+    const hl = stashed.replace(HL_REGEX, function (m, str, cmt, kw, num) {
+      if (str) return '<span class="st">' + str + '</span>';
+      if (cmt) return '<span class="cm">' + cmt + '</span>';
+      if (kw)  return '<span class="kw">' + kw  + '</span>';
+      if (num) return '<span class="nu">' + num + '</span>';
+      return m;
+    });
+
+    return hl.replace(/\u0001B(\d+)\u0001/g, (m, i) =>
+      '<span class="blk">[' + blocks[+i] + ']</span>'
+    );
+  }
+
+  /* =========================================================
+     状态
+     ========================================================= */
+  const state = {
+    langId: null,
+    mode: 'grid',
+    difficulty: 'normal',   // 'normal' | 'hard' | 'hell'
+    level: 1,
+    score: 0,
+    target: null,
+    cells: [],
+    lines: [],
+    selectedLines: new Set(),
+    locked: false
+  };
+
+  /* =========================================================
+     难度配置
+     ========================================================= */
+  function getDifficultyConfig() {
+    switch (state.difficulty) {
+      case 'hell':
+        return {
+          gridMin: 5,
+          gridMax: 7,
+          longErr: 5,
+          longOk: 3,
+          hellMode: true,
+          scoreBonus: 200
+        };
+      case 'hard':
+        return {
+          gridMin: 3,
+          gridMax: 5,
+          longErr: 4,
+          longOk: 4,
+          hellMode: false,
+          scoreBonus: 100
+        };
+      default:
+        return {
+          gridMin: 2,
+          gridMax: 3,
+          longErr: 3,
+          longOk: 5,
+          hellMode: false,
+          scoreBonus: 0
+        };
+    }
+  }
+
+  /* =========================================================
+     DOM
+     ========================================================= */
+  const homeScreen = $('homeScreen');
+  const gameScreen = $('gameScreen');
+  const langGrid   = $('langGrid');
+  const backBtn    = $('backBtn');
+  const capHead    = $('capHead');
+  const targetLabel= $('targetLabel');
+  const descText   = $('descText');
+  const gridArea   = $('gridArea');
+  const longArea   = $('longArea');
+  const codeBlock  = $('codeBlock');
+  const feedback   = $('feedback');
+  const verifyBtn  = $('verifyBtn');
+  const refreshBtn = $('refreshBtn');
+  const overlay    = $('overlay');
+  const overScore  = $('overScore');
+  const overHome   = $('overHome');
+  const overNext   = $('overNext');
+  const homeFoot   = $('homeFoot');
+
+  /* =========================================================
+     首页
+     ========================================================= */
+  function buildHome() {
+    langGrid.innerHTML = '';
+
+    Object.keys(DB).forEach(id => {
+      const lang = DB[id];
+      const total = lang.syntax.length + lang.logic.length +
+                    lang.runtime.length + lang.ok.length;
+      const card = document.createElement('div');
+      card.className = 'lang-card';
+      card.innerHTML =
+        '<div class="lang-icon" style="background:' + lang.color +
+        ';color:' + lang.textColor + '">' + lang.short + '</div>' +
+        '<div class="lang-info">' +
+          '<div class="lang-name">' + lang.name + '</div>' +
+          '<div class="lang-sub">' + total + ' 道题</div>' +
+        '</div>';
+      card.addEventListener('click', () => enterGame(id));
+      langGrid.appendChild(card);
+    });
+
+    const mixed = document.createElement('div');
+    mixed.className = 'lang-card';
+    mixed.innerHTML =
+      '<div class="lang-icon" style="background:#1b5a8b;color:#fff">ALL</div>' +
+      '<div class="lang-info">' +
+        '<div class="lang-name">混合挑战</div>' +
+        '<div class="lang-sub">全部语言随机出题</div>' +
+      '</div>';
+    mixed.addEventListener('click', () => enterGame('mixed'));
+    langGrid.appendChild(mixed);
+  }
+
+  function updateHomeFoot() {
+    const cfg = getDifficultyConfig();
+    const diffLabel = state.difficulty === 'hell' ? '地狱'
+                    : state.difficulty === 'hard' ? '困难' : '普通';
+
+    if (state.mode === 'grid') {
+      const range = cfg.gridMin === cfg.gridMax
+        ? cfg.gridMin
+        : cfg.gridMin + '~' + cfg.gridMax;
+      let extra = '';
+      if (state.difficulty === 'hell') {
+        extra = '<br><span class="danger">⚠ 干扰项全部是错误代码，没有正确代码做参照</span>';
+      }
+      homeFoot.innerHTML =
+        '<b>' + diffLabel + '</b> · 每关有 <b>' + range + '</b> 张正确代码' +
+        '<br>选出所有包含指定错误的片段' + extra;
+    } else {
+      homeFoot.innerHTML =
+        '<b>' + diffLabel + '</b> · 长代码有 <b>' + cfg.longErr + '</b> 个错误块' +
+        '<br>拖拽框选或点击选中包含错误的行';
+    }
+  }
+
+  // 模式切换
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.mode = btn.dataset.mode;
+      updateHomeFoot();
+    });
+  });
+
+  // 难度切换
+  document.querySelectorAll('.diff-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.difficulty = btn.dataset.diff;
+      updateHomeFoot();
+    });
+  });
+
+  /* =========================================================
+     屏幕切换
+     ========================================================= */
+  function showScreen(name) {
+    homeScreen.classList.toggle('active', name === 'home');
+    gameScreen.classList.toggle('active', name === 'game');
+  }
+
+  function applyHellTheme() {
+    const isHell = state.difficulty === 'hell';
+    capHead.classList.toggle('hell-mode', isHell);
+    verifyBtn.classList.toggle('hell', isHell);
+  }
+
+  function goHome() {
+    cancelAllTimers();
+    overlay.classList.remove('show');
+    state.locked = false;
+    state.cells = [];
+    state.lines = [];
+    state.selectedLines.clear();
+    dragState = null;
+    verifyBtn.disabled = false;
+    feedback.textContent = '';
+    feedback.className = 'feedback';
+    gridArea.innerHTML = '';
+    codeBlock.innerHTML = '';
+    showScreen('home');
+  }
+
+  function enterGame(langId) {
+    cancelAllTimers();
+    overlay.classList.remove('show');
+    state.locked = false;
+
+    state.langId = langId;
+    state.level = 1;
+    state.score = 0;
+    showScreen('game');
+    applyHellTheme();
+
+    if (state.mode === 'grid') {
+      gridArea.style.display = 'grid';
+      longArea.style.display = 'none';
+      startGridLevel();
+    } else {
+      gridArea.style.display = 'none';
+      longArea.style.display = 'block';
+      startLongLevel();
+    }
+  }
+
+  function getPool(langId) {
+    if (langId !== 'mixed') return DB[langId];
+    const merged = { syntax: [], logic: [], runtime: [], ok: [] };
+    Object.values(DB).forEach(lang => {
+      merged.syntax.push(...lang.syntax);
+      merged.logic.push(...lang.logic);
+      merged.runtime.push(...lang.runtime);
+      merged.ok.push(...lang.ok);
+    });
+    return merged;
+  }
+
+  /* =========================================================
+     九宫格模式
+     ========================================================= */
+  function startGridLevel() {
+    cancelAllTimers();
+    state.locked = false;
+    state.cells = [];
+    feedback.textContent = '';
+    feedback.className = 'feedback';
+    verifyBtn.disabled = false;
+
+    const cfg = getDifficultyConfig();
+
+    descText.innerHTML = state.difficulty === 'hell'
+      ? '的所有代码。<br>⚠ 所有卡片都可能有问题，请仔细辨认。'
+      : '的所有代码。<br>在没有新代码可以点按后，请点击“验证”。';
+
+    const pool = getPool(state.langId);
+    const types = ['syntax', 'logic', 'runtime'];
+    const target = pick(types);
+    const others = types.filter(t => t !== target);
+
+    const targetCount = cfg.gridMin +
+      Math.floor(Math.random() * (cfg.gridMax - cfg.gridMin + 1));
+
+    state.target = target;
+    targetLabel.textContent = TYPE_NAMES[target];
+
+    const targetItems = sample(pool[target], targetCount);
+
+    // 干扰项池
+    const need = 9 - targetCount;
+    let distractorPool;
+
+    if (cfg.hellMode) {
+      // 地狱模式：干扰项只用其他两类错误，不放正确代码
+      distractorPool = [...pool[others[0]], ...pool[others[1]]];
+      if (distractorPool.length < need) {
+        distractorPool = [...distractorPool, ...pool.ok];
+      }
+    } else {
+      distractorPool = [...pool.ok, ...pool[others[0]], ...pool[others[1]]];
+    }
+
+    const otherItems = sample(distractorPool, need);
+
+    const items = shuffle([
+      ...targetItems.map(it => ({ ...it, isTarget: true })),
+      ...otherItems.map(it => ({ ...it, isTarget: false }))
+    ]);
+
+    gridArea.innerHTML = '';
+    items.forEach(item => {
+      const cellEl = document.createElement('div');
+      cellEl.className = 'cell';
+
+      const tag = document.createElement('div');
+      tag.className = 'lang-tag';
+      tag.textContent = item.lang;
+      cellEl.appendChild(tag);
+
+      const codeEl = document.createElement('div');
+      codeEl.className = 'code';
+      codeEl.innerHTML = highlight(item.code);
+      cellEl.appendChild(codeEl);
+
+      const cell = { el: cellEl, data: item, selected: false };
+      state.cells.push(cell);
+      cellEl.addEventListener('click', () => onCellClick(cell));
+      gridArea.appendChild(cellEl);
+    });
+  }
+
+  function onCellClick(cell) {
+    if (state.locked) return;
+    cell.selected = !cell.selected;
+    cell.el.classList.toggle('selected', cell.selected);
+    cell.el.classList.remove('wrong');
+    if (feedback.classList.contains('err')) {
+      feedback.textContent = '';
+      feedback.className = 'feedback';
+    }
+  }
+
+  function verifyGrid() {
+    if (state.locked) return;
+    state.locked = true;
+    verifyBtn.disabled = true;
+
+    let wrongPick = 0;
+    let missed = 0;
+
+    state.cells.forEach(cell => {
+      const should = cell.data.isTarget;
+      if (cell.selected && !should) {
+        cell.el.classList.add('wrong');
+        wrongPick++;
+      } else if (!cell.selected && should) {
+        missed++;
+      }
+    });
+
+    if (wrongPick === 0 && missed === 0) {
+      const cfg = getDifficultyConfig();
+      const targetCount = state.cells.filter(c => c.data.isTarget).length;
+      const gained = 100 + targetCount * 30 + cfg.scoreBonus;
+      state.score += gained;
+      feedback.textContent = '验证通过 +' + gained;
+      feedback.className = 'feedback ok';
+      later(showOverlay, 620);
+      return;
+    }
+
+    feedback.textContent = '验证失败，请重试';
+    feedback.className = 'feedback err';
+    document.getElementById('app').classList.add('shake');
+    later(() => document.getElementById('app').classList.remove('shake'), 440);
+
+    later(() => {
+      if (!state.locked) return;
+      state.cells.forEach(c => {
+        c.el.classList.remove('wrong', 'selected');
+        c.selected = false;
+      });
+      feedback.textContent = '';
+      feedback.className = 'feedback';
+      state.locked = false;
+      verifyBtn.disabled = false;
+    }, 1400);
+  }
+
+  /* =========================================================
+     长代码模式
+     ========================================================= */
+  function startLongLevel() {
+    cancelAllTimers();
+    state.locked = false;
+    state.lines = [];
+    state.selectedLines.clear();
+    dragState = null;
+    feedback.textContent = '';
+    feedback.className = 'feedback';
+    verifyBtn.disabled = false;
+    codeBlock.innerHTML = '';
+
+    descText.innerHTML = '的代码行。<br>按住鼠标拖拽框选，或点击单行切换。';
+
+    const cfg = getDifficultyConfig();
+    const pool = getPool(state.langId);
+    const types = ['syntax', 'logic', 'runtime'];
+    const target = pick(types);
+    const others = types.filter(t => t !== target);
+
+    state.target = target;
+    targetLabel.textContent = TYPE_NAMES[target];
+
+    const errCount = cfg.longErr;
+    const okCount  = cfg.longOk;
+
+    const errBlocks = sample(pool[target], errCount);
+    const okBlocks  = sample(pool.ok, okCount);
+
+    const allBlocks = shuffle([
+      ...okBlocks.map(b => ({ block: b, isError: false })),
+      ...errBlocks.map(b => ({ block: b, isError: true }))
+    ]);
+
+    const lines = [];
+    allBlocks.forEach(({ block, isError }) => {
+      block.code.split('\n').forEach(text => {
+        lines.push({ text, isError });
+      });
+    });
+
+    lines.forEach((lineData, idx) => {
+      const lineEl = document.createElement('div');
+      lineEl.className = 'code-line';
+      lineEl.dataset.index = idx;
+
+      const numEl = document.createElement('span');
+      numEl.className = 'line-num';
+      numEl.textContent = (idx + 1);
+
+      const codeEl = document.createElement('span');
+      codeEl.className = 'line-code';
+      codeEl.innerHTML = highlight(lineData.text);
+
+      lineEl.appendChild(numEl);
+      lineEl.appendChild(codeEl);
+      codeBlock.appendChild(lineEl);
+
+      state.lines.push({ el: lineEl, isError: lineData.isError });
+    });
+  }
+
+  let dragState = null;
+
+  function getLineIndexAt(clientX, clientY) {
+    const el = document.elementFromPoint(clientX, clientY);
+    const line = el && el.closest('.code-line');
+    if (line && codeBlock.contains(line)) {
+      return parseInt(line.dataset.index, 10);
+    }
+    return -1;
+  }
+
+  function updateSelectionRect() {
+    if (!dragState || !dragState.rect) return;
+    const r = dragState.rect;
+    const x1 = Math.min(dragState.startX, dragState.curX);
+    const y1 = Math.min(dragState.startY, dragState.curY);
+    const x2 = Math.max(dragState.startX, dragState.curX);
+    const y2 = Math.max(dragState.startY, dragState.curY);
+    r.style.left = x1 + 'px';
+    r.style.top = y1 + 'px';
+    r.style.width = (x2 - x1) + 'px';
+    r.style.height = (y2 - y1) + 'px';
+  }
+
+  function applyBoxSelection() {
+    state.selectedLines.clear();
+    state.lines.forEach(l => l.el.classList.remove('selected'));
+
+    const rect = {
+      left: Math.min(dragState.startX, dragState.curX),
+      top: Math.min(dragState.startY, dragState.curY),
+      right: Math.max(dragState.startX, dragState.curX),
+      bottom: Math.max(dragState.startY, dragState.curY)
+    };
+
+    const blockRect = codeBlock.getBoundingClientRect();
+
+    state.lines.forEach((line, i) => {
+      const lr = line.el.getBoundingClientRect();
+      const lineTop = lr.top - blockRect.top + codeBlock.scrollTop;
+      const lineBottom = lr.bottom - blockRect.top + codeBlock.scrollTop;
+      const lineLeft = lr.left - blockRect.left + codeBlock.scrollLeft;
+      const lineRight = lr.right - blockRect.left + codeBlock.scrollLeft;
+
+      const rTop = rect.top + codeBlock.scrollTop;
+      const rBottom = rect.bottom + codeBlock.scrollTop;
+      const rLeft = rect.left + codeBlock.scrollLeft;
+      const rRight = rect.right + codeBlock.scrollLeft;
+
+      const intersects = !(
+        lineBottom < rTop ||
+        lineTop > rBottom ||
+        lineRight < rLeft ||
+        lineLeft > rRight
+      );
+
+      if (intersects) {
+        line.el.classList.add('selected');
+        state.selectedLines.add(i);
+      }
+    });
+  }
+
+  function toggleLine(idx) {
+    if (state.locked) return;
+    const line = state.lines[idx];
+    if (!line) return;
+    if (state.selectedLines.has(idx)) {
+      state.selectedLines.delete(idx);
+      line.el.classList.remove('selected');
+    } else {
+      state.selectedLines.add(idx);
+      line.el.classList.add('selected');
+    }
+    if (feedback.classList.contains('err')) {
+      feedback.textContent = '';
+      feedback.className = 'feedback';
+    }
+  }
+
+  codeBlock.addEventListener('pointerdown', e => {
+    if (state.locked) return;
+    if (e.button !== undefined && e.button !== 0) return;
+
+    const rect = codeBlock.getBoundingClientRect();
+    dragState = {
+      startX: e.clientX - rect.left,
+      startY: e.clientY - rect.top,
+      curX: e.clientX - rect.left,
+      curY: e.clientY - rect.top,
+      moved: false,
+      rect: null,
+      targetIndex: getLineIndexAt(e.clientX, e.clientY)
+    };
+
+    try { codeBlock.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+
+  codeBlock.addEventListener('pointermove', e => {
+    if (!dragState) return;
+    const rect = codeBlock.getBoundingClientRect();
+    dragState.curX = e.clientX - rect.left;
+    dragState.curY = e.clientY - rect.top;
+
+    const dx = Math.abs(dragState.curX - dragState.startX);
+    const dy = Math.abs(dragState.curY - dragState.startY);
+
+    if (!dragState.moved && (dx > 6 || dy > 6)) {
+      dragState.moved = true;
+      dragState.rect = document.createElement('div');
+      dragState.rect.className = 'selection-rect';
+      codeBlock.appendChild(dragState.rect);
+    }
+
+    if (dragState.moved) {
+      updateSelectionRect();
+      applyBoxSelection();
+    }
+  });
+
+  codeBlock.addEventListener('pointerup', e => {
+    if (!dragState) return;
+
+    try { codeBlock.releasePointerCapture(e.pointerId); } catch (err) {}
+
+    if (dragState.moved) {
+      if (dragState.rect) dragState.rect.remove();
+    } else {
+      const idx = dragState.targetIndex;
+      if (idx >= 0) toggleLine(idx);
+    }
+    dragState = null;
+  });
+
+  codeBlock.addEventListener('pointercancel', () => {
+    if (!dragState) return;
+    if (dragState.rect) dragState.rect.remove();
+    dragState = null;
+  });
+
+  function verifyLong() {
+    if (state.locked) return;
+    state.locked = true;
+    verifyBtn.disabled = true;
+
+    let wrongPick = 0;
+    let missed = 0;
+
+    state.lines.forEach((line, i) => {
+      const selected = state.selectedLines.has(i);
+      if (selected && !line.isError) {
+        line.el.classList.add('wrong');
+        wrongPick++;
+      } else if (!selected && line.isError) {
+        missed++;
+      }
+    });
+
+    if (wrongPick === 0 && missed === 0) {
+      const cfg = getDifficultyConfig();
+      const errCount = state.lines.filter(l => l.isError).length;
+      const gained = 120 + errCount * 40 + cfg.scoreBonus;
+      state.score += gained;
+      feedback.textContent = '验证通过 +' + gained;
+      feedback.className = 'feedback ok';
+      later(showOverlay, 620);
+      return;
+    }
+
+    feedback.textContent = '验证失败，请重试';
+    feedback.className = 'feedback err';
+    document.getElementById('app').classList.add('shake');
+    later(() => document.getElementById('app').classList.remove('shake'), 440);
+
+    later(() => {
+      if (!state.locked) return;
+      state.lines.forEach(line => {
+        line.el.classList.remove('wrong', 'selected');
+      });
+      state.selectedLines.clear();
+      feedback.textContent = '';
+      feedback.className = 'feedback';
+      state.locked = false;
+      verifyBtn.disabled = false;
+    }, 1400);
+  }
+
+  /* =========================================================
+     通关浮层 / 下一关
+     ========================================================= */
+  function showOverlay() {
+    overScore.textContent = state.score;
+    overlay.classList.add('show');
+  }
+
+  function nextLevel() {
+    cancelAllTimers();
+    overlay.classList.remove('show');
+    state.locked = false;
+    state.level++;
+    if (state.mode === 'grid') startGridLevel();
+    else startLongLevel();
+  }
+
+  /* =========================================================
+     事件绑定
+     ========================================================= */
+  verifyBtn.addEventListener('click', () => {
+    if (state.mode === 'grid') verifyGrid();
+    else verifyLong();
+  });
+
+  refreshBtn.addEventListener('click', () => {
+    if (state.locked) return;
+    if (state.mode === 'grid') startGridLevel();
+    else startLongLevel();
+  });
+
+  backBtn.addEventListener('click', goHome);
+  overHome.addEventListener('click', goHome);
+  overNext.addEventListener('click', nextLevel);
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter'
+        && gameScreen.classList.contains('active')
+        && !overlay.classList.contains('show')
+        && !verifyBtn.disabled) {
+      verifyBtn.click();
+    }
+  });
+
+  /* =========================================================
+     启动
+     ========================================================= */
+  buildHome();
+  updateHomeFoot();
+})();
+</script>
+</body>
+</html>
